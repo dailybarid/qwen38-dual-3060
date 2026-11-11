@@ -13,6 +13,9 @@ faster than a 24.5 ms/token memory-bandwidth floor would suggest.
 | Result | **44–55 tok/s** code, **38–42 tok/s** prose, 526 tok/s prompt processing |
 | Context | 100,400 tokens at **~9.9 / 11.2 GiB** per card |
 
+Write-up version of this page (with charts):
+<https://www.eljazeir.com/archives/627>
+
 ## Why it works
 
 A dense model reads **all of its weights once per generated token**. With 720 GB/s
