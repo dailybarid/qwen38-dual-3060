@@ -1,0 +1,38 @@
+[Unit]
+Description=Qwen3.8-27B-UD-Q4_K_M on 2x RTX 3060 (tensor split + native MTP)
+After=network-online.target
+
+[Service]
+Type=simple
+# Required: consumer cards have no P2P DMA, so the all-reduce must stay in
+# llama.cpp's own kernel instead of going through NCCL/host memory.
+Environment=GGML_CUDA_ALLREDUCE=internal
+
+# Refuse to start unless both cards are free. Turns a mid-load CUDA OOM into
+# one clear line. 8600 MiB covers weights + q4_0 KV at 100k context.
+ExecStartPre=/bin/sh -c 'for i in 0 1; do f=$(nvidia-smi --query-gpu=memory.free --format=csv,noheader,nounits -i $$i); [ "$$f" -ge 8600 ] || { echo "GPU$$i only $${f}MiB free (need 8600)"; exit 1; }; done'
+
+# EDIT: point -m at the GGUF (in an HF cache, use the snapshots/... symlink,
+# not the blobs/... target).
+ExecStart=/usr/local/bin/llama-server \
+  -m /path/to/Qwen3.8-27B-UD-Q4_K_M.gguf \
+  -ngl 99 \
+  --split-mode tensor --tensor-split 1,1 \
+  -c 102400 \
+  -ctk q4_0 -ctv q4_0 \
+  -np 1 -fa on \
+  --spec-type draft-mtp --spec-draft-n-max 2 \
+  --jinja --metrics \
+  --alias Qwen3.8-27B \
+  --host 127.0.0.1 --port 18435
+
+Restart=on-failure
+RestartSec=15
+StartLimitBurst=3
+KillSignal=SIGINT
+TimeoutStopSec=60
+StandardOutput=append:/var/tmp/qwen38tp.log
+StandardError=append:/var/tmp/qwen38tp.log
+
+[Install]
+WantedBy=default.target
